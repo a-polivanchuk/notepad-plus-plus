@@ -2737,11 +2737,18 @@ int FindReplaceDlg::processAll(ProcessOperation op, const FindOption *opt, bool 
 {
 	if (op == ProcessReplaceAll && (*_ppEditView)->getCurrentBuffer()->isReadOnly())
 	{
-		NativeLangSpeaker *pNativeSpeaker = (NppParameters::getInstance()).getNativeLangSpeaker();
+		NppParameters& nppParam = NppParameters::getInstance();
+		NativeLangSpeaker *pNativeSpeaker = nppParam.getNativeLangSpeaker();
 		generic_string msg = pNativeSpeaker->getLocalizedStrFromID("find-status-replaceall-readonly", TEXT("Replace All: Cannot replace text. The current document is read only."));
 		setStatusbarMessage(msg, FSNotFound);
 		return 0;
 	}
+
+	// Turn OFF all the notification of modification (SCN_MODIFIED) for the sake of performance
+	LRESULT notifFlag = (*_ppEditView)->execute(SCI_GETMODEVENTMASK);
+	(*_ppEditView)->execute(SCI_SETMODEVENTMASK, 0);
+
+
 
 	const FindOption *pOptions = opt?opt:_env;
 	const TCHAR *txt2find = pOptions->_str2Search.c_str();
@@ -2804,6 +2811,17 @@ int FindReplaceDlg::processAll(ProcessOperation op, const FindOption *opt, bool 
 	findReplaceInfo._endRange = endPosition;
 
 	int nbProcessed = processRange(op, findReplaceInfo, pFindersInfo, pOptions, colourStyleID);
+
+
+	// Turn ON the notifications after operations
+	(*_ppEditView)->execute(SCI_SETMODEVENTMASK, notifFlag);
+	if (op == ProcessReplaceAll && nbProcessed > 0) // All the notification of modification (SCN_MODIFIED) were removed during the operations, so we set modified status true here
+	{
+		Buffer* buf = (*_ppEditView)->getCurrentBuffer();
+		buf->setModifiedStatus(true);
+		::SendMessage(_hParent, NPPM_INTERNAL_DOCMODIFIEDBYREPLACEALL, reinterpret_cast<WPARAM>(buf), 0);
+	}
+
 
 	if (nbProcessed == FIND_INVALID_REGULAR_EXPRESSION)
 		return FIND_INVALID_REGULAR_EXPRESSION;
@@ -4736,7 +4754,7 @@ void Finder::addSearchResultInfo(int count, int countSearched, bool searchedEnti
 
 		generic_string hitsIn = count == 1 ? TEXT("hit") : TEXT("hits");
 
-		generic_string fileOrSelection = searchedEntireNotSelection ? TEXT("file") : TEXT("selection");;
+		generic_string fileOrSelection = searchedEntireNotSelection ? TEXT("file") : TEXT("selection");
 		if (_nbFoundFiles != 1)
 		{
 			fileOrSelection += TEXT("s");
@@ -5240,10 +5258,10 @@ intptr_t CALLBACK Finder::run_dlgProc(UINT message, WPARAM wParam, LPARAM lParam
 				generic_string collapseAll = pNativeSpeaker->getLocalizedStrFromID("finder-collapse-all", TEXT("Fold all"));
 				generic_string uncollapseAll = pNativeSpeaker->getLocalizedStrFromID("finder-uncollapse-all", TEXT("Unfold all"));
 				generic_string copyLines = pNativeSpeaker->getLocalizedStrFromID("finder-copy", TEXT("Copy Selected Line(s)"));
-				generic_string copyVerbatim = pNativeSpeaker->getLocalizedStrFromID("finder-copy-verbatim", TEXT("Copy"));
+				generic_string copyVerbatim = pNativeSpeaker->getNativeLangMenuString(IDM_EDIT_COPY, L"Copy", true);
 				copyVerbatim += TEXT("\tCtrl+C");
 				generic_string copyPaths = pNativeSpeaker->getLocalizedStrFromID("finder-copy-paths", TEXT("Copy Pathname(s)"));
-				generic_string selectAll = pNativeSpeaker->getLocalizedStrFromID("finder-select-all", TEXT("Select all"));
+				generic_string selectAll = pNativeSpeaker->getNativeLangMenuString(IDM_EDIT_SELECTALL, L"Select all", true);
 				selectAll += TEXT("\tCtrl+A");
 				generic_string clearAll = pNativeSpeaker->getLocalizedStrFromID("finder-clear-all", TEXT("Clear all"));
 				generic_string purgeForEverySearch = pNativeSpeaker->getLocalizedStrFromID("finder-purge-for-every-search", TEXT("Purge for every search"));
@@ -5879,7 +5897,7 @@ int Progress::createProgressWindow()
 		::SendMessage(_hPBar, PBM_SETBARCOLOR, 0, static_cast<LPARAM>(NppDarkMode::getDarkerTextColor()));
 	}
 
-	generic_string cancel = pNativeSpeaker->getLocalizedStrFromID("progress-cancel-button", TEXT("Cancel"));
+	generic_string cancel = pNativeSpeaker->getLocalizedStrFromID("common-cancel", TEXT("Cancel"));
 
 	_hBtn = ::CreateWindowEx(0, TEXT("BUTTON"), cancel.c_str(),
 		WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | BS_TEXT,

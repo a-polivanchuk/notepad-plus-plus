@@ -339,8 +339,7 @@ LRESULT Notepad_plus::init(HWND hwnd)
 	_mainEditView.execute(SCI_SETZOOM, svp._zoom);
 	_subEditView.execute(SCI_SETZOOM, svp._zoom2);
 
-	_mainEditView.execute(SCI_SETMULTIPLESELECTION, true);
-	_subEditView.execute(SCI_SETMULTIPLESELECTION, true);
+	::SendMessage(hwnd, NPPM_INTERNAL_SETMULTISELCTION, 0, 0);
 
 	// Make backspace or delete work with multiple selections
 	_mainEditView.execute(SCI_SETADDITIONALSELECTIONTYPING, true);
@@ -2450,13 +2449,20 @@ int Notepad_plus::doSaveOrNot(const TCHAR* fn, bool isMulti)
 	if ((NppParameters::getInstance()).isEndSessionCritical())
 		return IDCANCEL; // simulate Esc-key or Cancel-button as there should not be any big delay / code-flow block
 
-	// In case Notepad++ is iconized into notification zone
-	if (!::IsWindowVisible(_pPublicInterface->getHSelf()))
+	// In case Notepad++ is minimized into taskbar or iconized into notification zone
+	if (::IsIconic(_pPublicInterface->getHSelf()))
 	{
-		::ShowWindow(_pPublicInterface->getHSelf(), SW_SHOW);
+		::ShowWindow(_pPublicInterface->getHSelf(), SW_RESTORE);
+	}
+	else
+	{
+		if (!::IsWindowVisible(_pPublicInterface->getHSelf()))
+		{
+			::ShowWindow(_pPublicInterface->getHSelf(), SW_SHOW);
 
-		// Send sizing info to make window fit (specially to show tool bar.)
-		::SendMessage(_pPublicInterface->getHSelf(), WM_SIZE, 0, 0);
+			// Send sizing info to make window fit (specially to show tool bar.)
+			::SendMessage(_pPublicInterface->getHSelf(), WM_SIZE, 0, 0);
+		}
 	}
 
 	if (!isMulti)
@@ -2567,9 +2573,12 @@ void Notepad_plus::checkClipboard()
 {
 	bool hasSelection = _pEditView->hasSelection();
 	bool canPaste = (_pEditView->execute(SCI_CANPASTE) != 0);
-	//enableCommand(IDM_EDIT_CUT, hasSelection, MENU | TOOLBAR);
-	//enableCommand(IDM_EDIT_COPY, hasSelection, MENU | TOOLBAR);
 
+	if (!NppParameters::getInstance().getSVP()._lineCopyCutWithoutSelection)
+	{
+		enableCommand(IDM_EDIT_CUT, hasSelection, MENU | TOOLBAR);
+		enableCommand(IDM_EDIT_COPY, hasSelection, MENU | TOOLBAR);
+	}
 	enableCommand(IDM_EDIT_PASTE, canPaste, MENU | TOOLBAR);
 	enableCommand(IDM_EDIT_DELETE, hasSelection, MENU | TOOLBAR);
 	enableCommand(IDM_EDIT_UPPERCASE, hasSelection, MENU);
@@ -7348,8 +7357,9 @@ void Notepad_plus::launchFileBrowser(const vector<generic_string> & folders, con
 		NativeLangSpeaker *pNativeSpeaker = nppParams.getNativeLangSpeaker();
 		generic_string title_temp = pNativeSpeaker->getAttrNameStr(FB_PANELTITLE, FOLDERASWORKSPACE_NODE, "PanelTitle");
 
-		static TCHAR title[32];
-		if (title_temp.length() < 32)
+		const int titleLen = 64;
+		static TCHAR title[titleLen];
+		if (title_temp.length() < titleLen)
 		{
 			wcscpy_s(title, title_temp.c_str());
 			data.pszName = title;
@@ -7636,11 +7646,13 @@ static const QuoteParams quotes[] =
 	{TEXT("Darth Vader #2"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("You don't get to 500 million star systems without making a few enemies.")},
 	{TEXT("Doug Linder"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("A good programmer is someone who always looks both ways before crossing a one-way street.")},
 	{TEXT("Jean-Claude van Damme"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("A cookie has no soul, it's just a cookie. But before it was milk and eggs.\nAnd in eggs there's the potential for life.")},
+	{TEXT("Mark Zuckerberg"), QuoteParams::slow, false, SC_CP_UTF8, L_TEXT, TEXT("\"Black lives matter\" doesn't mean other lives don't - it's simply asking that the black community also achieves the justice they deserve.")},
 	{TEXT("Michael Feldman"), QuoteParams::slow, false, SC_CP_UTF8, L_TEXT, TEXT("Java is, in many ways, C++--.")},
 	{TEXT("Don Ho"), QuoteParams::slow, false, SC_CP_UTF8, L_TEXT, TEXT("Je mange donc je chie.")},
 	{TEXT("Don Ho #2"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("RTFM is the true path of every developer.\nBut it would happen only if there's no way out.")},
 	{TEXT("Don Ho #3"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("The smartphone is the best invention of the 21st century for avoiding eye contact with people you know while crossing the street.")},
 	{TEXT("Don Ho #4"), QuoteParams::rapid, false, SC_CP_UTF8, L_TEXT, TEXT("Poor countries' museums vs. rich countries' museums:\nThe first show what they have left.\nThe second show what they have stolen.")},
+	{TEXT("Don Ho #5"), QuoteParams::slow, false, SC_CP_UTF8, L_TEXT, TEXT("With great refactoring comes great regressions.")},
 	{TEXT("Anonymous #1"), QuoteParams::slow, false, SC_CP_UTF8, L_TEXT, TEXT("An opinion without 3.14 is just an onion.")},
 	{TEXT("Anonymous #2"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("Before sex, you help each other get naked, after sex you only dress yourself.\nMoral of the story: in life no one helps you once you're fucked.")},
 	{TEXT("Anonymous #3"), QuoteParams::rapid, false, SC_CP_UTF8, L_TEXT, TEXT("I'm not totally useless. I can be used as a bad example.")},

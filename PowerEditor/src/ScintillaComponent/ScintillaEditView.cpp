@@ -497,6 +497,18 @@ LRESULT ScintillaEditView::scintillaNew_Proc(HWND hwnd, UINT Message, WPARAM wPa
 			break;
 		}
 
+		case WM_CHAR:
+		{
+			// prevent "control characters" from being entered in text
+			// (don't need to be concerned about Tab or CR or LF etc here)
+			if ((NppParameters::getInstance()).getSVP()._npcNoInputC0 &&
+				((wParam >= 0 && wParam <= 31) || wParam == 127))
+			{
+				return FALSE;
+			}
+			break;
+		}
+
 		case WM_KEYUP:
 		{
 			if (wParam == VK_PRIOR || wParam == VK_NEXT)
@@ -524,7 +536,7 @@ LRESULT ScintillaEditView::scintillaNew_Proc(HWND hwnd, UINT Message, WPARAM wPa
 			SHORT alt = GetKeyState(VK_MENU);
 			SHORT shift = GetKeyState(VK_SHIFT);
 			bool isColumnSelection = (execute(SCI_GETSELECTIONMODE) == SC_SEL_RECTANGLE) || (execute(SCI_GETSELECTIONMODE) == SC_SEL_THIN);
-			bool column2MultSelect = (NppParameters::getInstance()).doColumn2MultiSelect();
+			bool column2MultSelect = (NppParameters::getInstance()).getSVP()._columnSel2MultiEdit;
 
 			if (wParam == VK_DELETE)
 			{
