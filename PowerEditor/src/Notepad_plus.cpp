@@ -198,6 +198,7 @@ LRESULT Notepad_plus::init(HWND hwnd)
 {
 	NppParameters& nppParam = NppParameters::getInstance();
 	NppGUI & nppGUI = nppParam.getNppGUI();
+	const UINT dpi = DPIManagerV2::getDpiForWindow(hwnd);
 
 	// Menu
 	_mainMenuHandle = ::GetMenu(hwnd);
@@ -432,11 +433,11 @@ LRESULT Notepad_plus::init(HWND hwnd)
 	//--Status Bar Section--//
 	bool willBeShown = nppGUI._statusBarShow;
 	_statusBar.init(_pPublicInterface->getHinst(), hwnd, 6);
-	_statusBar.setPartWidth(STATUSBAR_DOC_SIZE, nppParam._dpiManager.scaleX(220));
-	_statusBar.setPartWidth(STATUSBAR_CUR_POS, nppParam._dpiManager.scaleX(260));
-	_statusBar.setPartWidth(STATUSBAR_EOF_FORMAT, nppParam._dpiManager.scaleX(110));
-	_statusBar.setPartWidth(STATUSBAR_UNICODE_TYPE, nppParam._dpiManager.scaleX(120));
-	_statusBar.setPartWidth(STATUSBAR_TYPING_MODE, nppParam._dpiManager.scaleX(30));
+	_statusBar.setPartWidth(STATUSBAR_DOC_SIZE, DPIManagerV2::scale(220, dpi));
+	_statusBar.setPartWidth(STATUSBAR_CUR_POS, DPIManagerV2::scale(260, dpi));
+	_statusBar.setPartWidth(STATUSBAR_EOF_FORMAT, DPIManagerV2::scale(110, dpi));
+	_statusBar.setPartWidth(STATUSBAR_UNICODE_TYPE, DPIManagerV2::scale(120, dpi));
+	_statusBar.setPartWidth(STATUSBAR_TYPING_MODE, DPIManagerV2::scale(30, dpi));
 	_statusBar.display(willBeShown);
 
 	_pMainWindow = &_mainDocTab;
@@ -1831,8 +1832,8 @@ void Notepad_plus::getMatchedFileNames(const TCHAR *dir, size_t level, const vec
 				}
 				else if (isRecursive)
 				{
-					if ((OrdinalIgnoreCaseCompareStrings(foundData.cFileName, TEXT(".")) != 0) && 
-						(OrdinalIgnoreCaseCompareStrings(foundData.cFileName, TEXT("..")) != 0) &&
+					if ((wcscmp(foundData.cFileName, TEXT(".")) != 0) && 
+						(wcscmp(foundData.cFileName, TEXT("..")) != 0) &&
 						!matchInExcludeDirList(foundData.cFileName, patterns, level))
 					{
 						generic_string pathDir(dir);
@@ -3710,6 +3711,29 @@ BOOL Notepad_plus::processIncrFindAccel(MSG *msg) const
 	return ::TranslateAccelerator(_incrementFindDlg.getHSelf(), _accelerator.getIncrFindAccTable(), msg);
 }
 
+BOOL Notepad_plus::processTabSwitchAccel(MSG* msg) const
+{
+	HWND hDlg = nullptr;
+	auto isRightDlg = [&msg, &hDlg](HWND hWnd) -> bool {
+		const bool isRight = (hWnd == msg->hwnd || (::IsChild(hWnd, msg->hwnd) == TRUE));
+		if (isRight)
+		{
+			hDlg = hWnd;
+		}
+		return isRight;
+		};
+	
+	if (isRightDlg(_findReplaceDlg.getHSelf())
+		|| isRightDlg(_pluginsAdminDlg.getHSelf())
+		|| (ScintillaEditView::getUserDefineDlg() != nullptr
+			&& isRightDlg(ScintillaEditView::getUserDefineDlg()->getHSelf()))
+		)
+	{
+		return static_cast<BOOL>(::TranslateAccelerator(hDlg, _accelerator.getTabSwitchAccTable(), msg));
+	}
+	return FALSE;
+}
+
 void Notepad_plus::setLanguage(LangType langType)
 {
 	//Add logic to prevent changing a language when a document is shared between two views
@@ -3921,6 +3945,10 @@ LangType Notepad_plus::menuID2LangType(int cmdID)
             return L_GDSCRIPT;
         case IDM_LANG_HOLLYWOOD:
             return L_HOLLYWOOD;	    
+        case IDM_LANG_GOLANG:
+            return L_GOLANG;
+        case IDM_LANG_RAKU:
+            return L_RAKU;
         case IDM_LANG_USER:
             return L_USER;
 		default:
@@ -4276,15 +4304,17 @@ void Notepad_plus::dropFiles(HDROP hdrop)
 	if (hdrop)
 	{
 		// Determinate in which view the file(s) is (are) dropped
-		POINT p;
+		POINT p{};
 		::DragQueryPoint(hdrop, &p);
 		HWND hWin = ::ChildWindowFromPointEx(_pPublicInterface->getHSelf(), p, CWP_SKIPINVISIBLE);
 		if (!hWin) return;
 
-		if ((_subEditView.getHSelf() == hWin) || (_subDocTab.getHSelf() == hWin) || currentView() == SUB_VIEW)
-			switchEditViewTo(SUB_VIEW);
-		else
+		if ((_mainEditView.getHSelf() == hWin) || (_mainDocTab.getHSelf() == hWin))
 			switchEditViewTo(MAIN_VIEW);
+		else if ((_subEditView.getHSelf() == hWin) || (_subDocTab.getHSelf() == hWin))
+			switchEditViewTo(SUB_VIEW);
+		//else
+			// do not change the current Notepad++ edit-view
 
 		int filesDropped = ::DragQueryFile(hdrop, 0xffffffff, NULL, 0);
 
@@ -7616,7 +7646,7 @@ static const QuoteParams quotes[] =
 	{TEXT("Anonymous #8"), QuoteParams::slow, false, SC_CP_UTF8, L_TEXT, TEXT("Everything is a knife if you're strong enough.")},
 	{TEXT("Anonymous #9"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("I'M A FUCKING ANIMAL IN BED.\nMore specifically a koala.")},
 	{TEXT("Anonymous #10"), QuoteParams::slow, true, SC_CP_UTF8, L_TEXT, TEXT("Etc.\n\n(Abb.) End of Thinking Capacity.\n")},
-	{TEXT("Anonymous #11"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("We stopped checking for monsters under our bed, when we realized they were inside us.")},
+	{TEXT("Anonymous #11"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("In China, you can criticise every Roman numeral from I to X.\nBut you can't criticize Xi.")},
 	{TEXT("Anonymous #12"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("I would rather check my facebook than face my checkbook.")},
 	{TEXT("Anonymous #13"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("Whoever says Paper beats Rock is an idiot. Next time I see someone say that I will throw a rock at them while they hold up a sheet of paper.")},
 	{TEXT("Anonymous #14"), QuoteParams::rapid, true, SC_CP_UTF8, L_TEXT, TEXT("A better world is where chickens can cross the road without having their motives questioned.")},

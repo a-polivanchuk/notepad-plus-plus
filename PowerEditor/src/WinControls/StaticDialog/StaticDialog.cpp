@@ -18,7 +18,7 @@
 #include <windows.h>
 #include "StaticDialog.h"
 #include "Common.h"
-#include "NppDarkMode.h"
+//#include "NppDarkMode.h"
 
 StaticDialog::~StaticDialog()
 {
@@ -211,7 +211,7 @@ HGLOBAL StaticDialog::makeRTLResource(int dialogID, DLGTEMPLATE **ppMyDlgTemplat
 	if (!hDlgTemplate)
 		return NULL;
 
-	DLGTEMPLATE *pDlgTemplate = static_cast<DLGTEMPLATE *>(::LockResource(hDlgTemplate));
+	const DLGTEMPLATE *pDlgTemplate = static_cast<DLGTEMPLATE *>(::LockResource(hDlgTemplate));
 	if (!pDlgTemplate)
 		return NULL;
 
@@ -257,6 +257,7 @@ void StaticDialog::create(int dialogID, bool isRTL, bool msgDestParent)
 	}
 
 	NppDarkMode::setDarkTitleBar(_hSelf);
+	setDpi();
 
 	// if the destination of message NPPM_MODELESSDIALOG is not its parent, then it's the grand-parent
 	::SendMessage(msgDestParent ? _hParent : (::GetParent(_hParent)), NPPM_MODELESSDIALOG, MODELESSDIALOGADD, reinterpret_cast<WPARAM>(_hSelf));
