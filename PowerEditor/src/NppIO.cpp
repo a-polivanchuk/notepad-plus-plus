@@ -1874,7 +1874,6 @@ bool Notepad_plus::fileRename(BufferID id)
 	scnN.nmhdr.code = NPPN_FILEBEFORERENAME;
 	scnN.nmhdr.hwndFrom = _pPublicInterface->getHSelf();
 	scnN.nmhdr.idFrom = (uptr_t)bufferID;
-	_pluginsManager.notify(&scnN);
 
 	bool success = false;
 	bool isFileExisting = PathFileExists(buf->getFullPathName()) != FALSE;
@@ -1893,7 +1892,12 @@ bool Notepad_plus::fileRename(BufferID id)
 		std::wstring fn = fDlg.doSaveDlg();
 
 		if (!fn.empty())
+		{
+			_pluginsManager.notify(&scnN);
 			success = MainFileManager.moveFile(bufferID, fn.c_str());
+			scnN.nmhdr.code = success ? NPPN_FILERENAMED : NPPN_FILERENAMECANCEL;
+			_pluginsManager.notify(&scnN);
+		}
 	}
 	else
 	{
@@ -1901,8 +1905,9 @@ bool Notepad_plus::fileRename(BufferID id)
 		// So just rename the tab and rename the backup file too if applicable
 
 		// https://docs.microsoft.com/en-us/windows/desktop/FileIO/naming-a-file
-		// Reserved characters: < > : " / \ | ? *
-		std::wstring reservedChars = TEXT("<>:\"/\\|\?*");
+		// Reserved characters:  < > : " / \ | ? * tab  
+		//  ("tab" is not in the official list, but it is good to avoid it)
+		std::wstring reservedChars = TEXT("<>:\"/\\|\?*\t");
 
 		std::wstring staticName = _nativeLangSpeaker.getLocalizedStrFromID("tabrename-newname", L"New name");
 
@@ -1940,8 +1945,13 @@ bool Notepad_plus::fileRename(BufferID id)
 			}
 			else
 			{
-				success = true;
+				_pluginsManager.notify(&scnN);
 				buf->setFileName(tabNewNameStr.c_str());
+				scnN.nmhdr.code = NPPN_FILERENAMED;
+				_pluginsManager.notify(&scnN);
+
+				success = true;
+
 				bool isSnapshotMode = NppParameters::getInstance().getNppGUI().isSnapshotMode();
 				if (isSnapshotMode)
 				{
@@ -1961,9 +1971,6 @@ bool Notepad_plus::fileRename(BufferID id)
 			}
 		}
 	}
-
-	scnN.nmhdr.code = success ? NPPN_FILERENAMED : NPPN_FILERENAMECANCEL;
-	_pluginsManager.notify(&scnN);
 
 	return success;
 }

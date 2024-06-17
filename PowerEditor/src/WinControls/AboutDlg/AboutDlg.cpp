@@ -57,12 +57,11 @@ intptr_t CALLBACK AboutDlg::run_dlgProc(UINT message, WPARAM wParam, LPARAM lPar
 			//_pageLink.create(::GetDlgItem(_hSelf, IDC_HOME_ADDR), L"https://notepad-plus-plus.org/news/v843-unhappy-users-edition/";
 			//_pageLink.create(::GetDlgItem(_hSelf, IDC_HOME_ADDR), L"https://notepad-plus-plus.org/news/v844-happy-users-edition/";
             //_pageLink.create(::GetDlgItem(_hSelf, IDC_HOME_ADDR), L"https://notepad-plus-plus.org/news/v86-20thyearanniversary";
-
-            _pageLink.init(_hInst, _hSelf);
-            _pageLink.create(::GetDlgItem(_hSelf, IDC_HOME_ADDR), L"https://notepad-plus-plus.org/");
-
-
-			getClientRect(_rc);
+			_pageLink.init(_hInst, _hSelf);
+            _pageLink.create(::GetDlgItem(_hSelf, IDC_AUTHOR_NAME), L"https://notepad-plus-plus.org/news/v868-about-taiwan/");
+            
+			//_pageLink.init(_hInst, _hSelf);
+            //_pageLink.create(::GetDlgItem(_hSelf, IDC_HOME_ADDR), L"https://notepad-plus-plus.org/");
 
 			return TRUE;
 		}
@@ -98,7 +97,7 @@ intptr_t CALLBACK AboutDlg::run_dlgProc(UINT message, WPARAM wParam, LPARAM lPar
 			_dpiManager.setDpiWP(wParam);
 			destroy();
 			//setPositionDpi(lParam);
-			getClientRect(_rc);
+			getWindowRect(_rc);
 
 			return TRUE;
 		}
@@ -108,7 +107,8 @@ intptr_t CALLBACK AboutDlg::run_dlgProc(UINT message, WPARAM wParam, LPARAM lPar
 			const int iconSize = _dpiManager.scale(80);
 			if (_hIcon == nullptr)
 			{
-				DPIManagerV2::loadIcon(_hInst, MAKEINTRESOURCE(NppDarkMode::isEnabled() ? IDI_CHAMELEON_DM : IDI_CHAMELEON), iconSize, iconSize, &_hIcon);
+				//DPIManagerV2::loadIcon(_hInst, MAKEINTRESOURCE(NppDarkMode::isEnabled() ? IDI_CHAMELEON_DM : IDI_CHAMELEON), iconSize, iconSize, &_hIcon);
+				DPIManagerV2::loadIcon(_hInst, MAKEINTRESOURCE(NppDarkMode::isEnabled() ? IDI_TAIWANSSOVEREIGNTY_DM : IDI_TAIWANSSOVEREIGNTY), iconSize, iconSize, &_hIcon);
 			}
 
 			//HICON hIcon = (HICON)::LoadImage(_hInst, MAKEINTRESOURCE(IDI_JESUISCHARLIE), IMAGE_ICON, 64, 64, LR_DEFAULTSIZE);
@@ -151,7 +151,7 @@ void AboutDlg::doDialog()
 		create(IDD_ABOUTBOX);
 
 	// Adjust the position of AboutBox
-	goToCenter(SWP_HIDEWINDOW | SWP_NOSIZE | SWP_NOACTIVATE);
+	moveForDpiChange();
 	goToCenter(SWP_SHOWWINDOW | SWP_NOSIZE);
 }
 
@@ -353,7 +353,6 @@ intptr_t CALLBACK DebugInfoDlg::run_dlgProc(UINT message, WPARAM wParam, LPARAM 
 			_debugInfoStr += _loadedPlugins.length() == 0 ? L"none" : _loadedPlugins;
 			_debugInfoStr += L"\r\n";
 
-			getClientRect(_rc);
 			return TRUE;
 		}
 
@@ -381,8 +380,8 @@ intptr_t CALLBACK DebugInfoDlg::run_dlgProc(UINT message, WPARAM wParam, LPARAM 
 		case WM_DPICHANGED:
 		{
 			_dpiManager.setDpiWP(wParam);
-			getClientRect(_rc);
 			setPositionDpi(lParam);
+			getWindowRect(_rc);
 
 			return TRUE;
 		}
@@ -433,7 +432,7 @@ void DebugInfoDlg::doDialog()
 	refreshDebugInfo();
 
 	// Adjust the position of DebugBox
-	goToCenter(SWP_HIDEWINDOW | SWP_NOSIZE | SWP_NOACTIVATE);
+	moveForDpiChange();
 	goToCenter(SWP_SHOWWINDOW | SWP_NOSIZE);
 }
 
