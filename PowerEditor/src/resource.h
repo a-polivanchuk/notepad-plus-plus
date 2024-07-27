@@ -19,14 +19,14 @@
 //
 // Notepad++ version: begin
 //
-#define NOTEPAD_PLUS_VERSION TEXT("Notepad++ v8.6.8")
+#define NOTEPAD_PLUS_VERSION L"Notepad++ v8.6.9"
 
 // should be X.Y : ie. if VERSION_DIGITALVALUE == 4, 7, 1, 0 , then X = 4, Y = 71
-// ex : #define VERSION_VALUE TEXT("5.63\0")
-#define VERSION_INTERNAL_VALUE TEXT("8.68\0")
+// ex : #define VERSION_VALUE L"5.63\0"
+#define VERSION_INTERNAL_VALUE L"8.69\0"
 
-#define VERSION_PRODUCT_VALUE TEXT("8.6.8\0")
-#define VERSION_DIGITALVALUE 8, 6, 8, 0
+#define VERSION_PRODUCT_VALUE L"8.6.9\0"
+#define VERSION_DIGITALVALUE 8, 6, 9, 0
 
 // Notepad++ version: end
 
@@ -687,14 +687,6 @@
     	#define CHECKDOCOPT_NONE 0
     	#define CHECKDOCOPT_UPDATESILENTLY 1
     	#define CHECKDOCOPT_UPDATEGO2END 2
-
-    //
-    // Used by netnote plugin
-    //
-	#define NPPM_INTERNAL_SETFILENAME (NPPMSG + 63)
-    //wParam: BufferID to rename
-    //lParam: name to set (TCHAR*)
-    //Buffer must have been previously unnamed (eg "new 1" document types)
 
 
 
