@@ -20,6 +20,7 @@
 #include <uxtheme.h> // for EnableThemeDialogTexture
 #include <format>
 #include <windowsx.h> // for GET_X_LPARAM, GET_Y_LPARAM
+#include <atomic>
 #include "Notepad_plus_Window.h"
 #include "TaskListDlg.h"
 #include "ImageListSet.h"
@@ -38,6 +39,8 @@ using namespace std;
 #ifndef WM_DPICHANGED
 #define WM_DPICHANGED 0x02E0
 #endif
+
+std::atomic<bool> g_bNppExitFlag{ false };
 
 
 struct SortTaskListPred final
@@ -2721,6 +2724,11 @@ LRESULT Notepad_plus::process(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
 					return 0; // abort quitting
 				}
 
+				// from this point on the Notepad++ exit is inevitable
+				g_bNppExitFlag.store(true); // thread-safe op
+				// currently it is used only in the Notepad_plus::backupDocument worker thread,
+				// use it in such a thread like:	if (g_bNppExitFlag.load()) -> finish work of & exit the thread
+
 				if (_beforeSpecialView._isFullScreen)	//closing, return to windowed mode
 					fullScreenToggle();
 				if (_beforeSpecialView._isPostIt)		//closing, return to windowed mode
@@ -3894,39 +3902,6 @@ LRESULT Notepad_plus::process(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
 		}
 		break;
 
-		case NPPM_INTERNAL_REDUCETABBAR:
-		{
-			bool isReduceed = TabBarPlus::isReduced();
-
-			//Resize the tab height
-			int tabDpiDynamicalWidth = _mainDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? g_TabWidthCloseBtn : g_TabWidth);
-			int tabDpiDynamicalHeight = _mainDocTab.dpiManager().scale(isReduceed ? g_TabHeight : g_TabHeightLarge);
-
-			TabCtrl_SetPadding(_mainDocTab.getHSelf(), _mainDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? 10 : 6), 0);
-			TabCtrl_SetPadding(_subDocTab.getHSelf(), _subDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? 10 : 6), 0);
-
-			TabCtrl_SetItemSize(_mainDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
-			TabCtrl_SetItemSize(_subDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
-
-			//change the font
-			const auto& hf = _mainDocTab.getFont(isReduceed);
-			if (hf)
-			{
-				::SendMessage(_mainDocTab.getHSelf(), WM_SETFONT, reinterpret_cast<WPARAM>(hf), MAKELPARAM(TRUE, 0));
-				::SendMessage(_subDocTab.getHSelf(), WM_SETFONT, reinterpret_cast<WPARAM>(hf), MAKELPARAM(TRUE, 0));
-			}
-
-			::SendMessage(_pPublicInterface->getHSelf(), WM_SIZE, 0, 0);
-			break;
-		}
-
-		case NPPM_INTERNAL_REFRESHTABAR:
-		{
-			::InvalidateRect(_mainDocTab.getHSelf(), NULL, TRUE);
-			::InvalidateRect(_subDocTab.getHSelf(), NULL, TRUE);
-
-			break;
-		}
 		case NPPM_INTERNAL_LOCKTABBAR:
 		{
 			bool isDrag = TabBarPlus::doDragNDropOrNot();
@@ -3963,6 +3938,33 @@ LRESULT Notepad_plus::process(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
 		{
 			TabBarPlus::setMultiLine(!TabBarPlus::isMultiLine());
 			::SendMessage(_pPublicInterface->getHSelf(), WM_SIZE, 0, 0);
+			break;
+		}
+
+		case NPPM_INTERNAL_REDUCETABBAR:
+		{
+			TabBarPlus::setReduced(!TabBarPlus::isReduced(), &_mainDocTab);
+			bool isReduceed = TabBarPlus::isReduced();
+
+			//Resize the tab height
+			int tabDpiDynamicalWidth = _mainDocTab.dpiManager().scale((TabBarPlus::drawTabCloseButton() || TabBarPlus::drawTabPinButton()) ? g_TabWidthButton : g_TabWidth);
+			int tabDpiDynamicalHeight = _mainDocTab.dpiManager().scale(isReduceed ? g_TabHeight : g_TabHeightLarge);
+
+			TabCtrl_SetItemSize(_mainDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
+			TabCtrl_SetItemSize(_subDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
+
+			//change the font
+			const auto& hf = _mainDocTab.getFont(isReduceed);
+			if (hf)
+			{
+				::SendMessage(_mainDocTab.getHSelf(), WM_SETFONT, reinterpret_cast<WPARAM>(hf), MAKELPARAM(TRUE, 0));
+				::SendMessage(_subDocTab.getHSelf(), WM_SETFONT, reinterpret_cast<WPARAM>(hf), MAKELPARAM(TRUE, 0));
+			}
+
+			::SendMessage(_pPublicInterface->getHSelf(), WM_SIZE, 0, 0);
+
+			_mainDocTab.refresh();
+			_subDocTab.refresh();
 			break;
 		}
 
@@ -4004,7 +4006,7 @@ LRESULT Notepad_plus::process(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
 
 			// This part is just for updating (redraw) the tabs
 			int tabDpiDynamicalHeight = _mainDocTab.dpiManager().scale(TabBarPlus::isReduced() ? g_TabHeight : g_TabHeightLarge);
-			int tabDpiDynamicalWidth = _mainDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? g_TabWidthCloseBtn : g_TabWidth);
+			int tabDpiDynamicalWidth = _mainDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? g_TabWidthButton : g_TabWidth);
 			TabCtrl_SetItemSize(_mainDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 			TabCtrl_SetItemSize(_subDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 
@@ -4058,7 +4060,7 @@ LRESULT Notepad_plus::process(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
 
 			// This part is just for updating (redraw) the tabs
 			int tabDpiDynamicalHeight = _mainDocTab.dpiManager().scale(TabBarPlus::isReduced() ? g_TabHeight : g_TabHeightLarge);
-			int tabDpiDynamicalWidth = _mainDocTab.dpiManager().scale(TabBarPlus::drawTabPinButton() ? g_TabWidthCloseBtn : g_TabWidth);
+			int tabDpiDynamicalWidth = _mainDocTab.dpiManager().scale(TabBarPlus::drawTabPinButton() ? g_TabWidthButton : g_TabWidth);
 			TabCtrl_SetItemSize(_mainDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 			TabCtrl_SetItemSize(_subDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 

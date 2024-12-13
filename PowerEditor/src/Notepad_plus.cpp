@@ -235,7 +235,7 @@ LRESULT Notepad_plus::init(HWND hwnd)
 	const ScintillaViewParams & svp = nppParam.getSVP();
 
 	int tabBarStatus = nppGUI._tabStatus;
-	TabBarPlus::setReduced((tabBarStatus & TAB_REDUCE) != 0);
+	TabBarPlus::setReduced((tabBarStatus & TAB_REDUCE) != 0, &_mainDocTab);
 
 	const int tabIconSet = NppDarkMode::getTabIconSet(NppDarkMode::isEnabled());
 	unsigned char indexDocTabIcon = 0;
@@ -394,10 +394,7 @@ LRESULT Notepad_plus::init(HWND hwnd)
 	}
 
 	int tabDpiDynamicalHeight = _mainDocTab.dpiManager().scale(TabBarPlus::isReduced() ? g_TabHeight : g_TabHeightLarge);
-	int tabDpiDynamicalWidth = _mainDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? g_TabWidthCloseBtn : g_TabWidth);
-
-	TabCtrl_SetPadding(_mainDocTab.getHSelf(), _mainDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? 10 : 6), 0);
-	TabCtrl_SetPadding(_subDocTab.getHSelf(), _subDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? 10 : 6), 0);
+	int tabDpiDynamicalWidth = _mainDocTab.dpiManager().scale(TabBarPlus::drawTabCloseButton() ? g_TabWidthButton : g_TabWidth);
 
 	TabCtrl_SetItemSize(_mainDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
 	TabCtrl_SetItemSize(_subDocTab.getHSelf(), tabDpiDynamicalWidth, tabDpiDynamicalHeight);
@@ -3635,7 +3632,8 @@ void Notepad_plus::maintainIndentation(wchar_t ch)
 
 	if (type == L_C || type == L_CPP || type == L_JAVA || type == L_CS || type == L_OBJC ||
 		type == L_PHP || type == L_JS || type == L_JAVASCRIPT || type == L_JSP || type == L_CSS || type == L_PERL || 
-		type == L_RUST || type == L_POWERSHELL || type == L_JSON || type == L_JSON5 || autoIndentMode == ExternalLexerAutoIndentMode::C_Like)
+		type == L_RUST || type == L_POWERSHELL || type == L_JSON || type == L_JSON5 || type == L_TYPESCRIPT || type == L_GOLANG || type == L_SWIFT || 
+		autoIndentMode == ExternalLexerAutoIndentMode::C_Like)
 	{
 		if (((eolMode == SC_EOL_CRLF || eolMode == SC_EOL_LF) && ch == '\n') ||
 			(eolMode == SC_EOL_CR && ch == '\r'))
@@ -4610,9 +4608,9 @@ void Notepad_plus::hideView(int whichOne)
 	// resize the main window
 	::SendMessage(_pPublicInterface->getHSelf(), WM_SIZE, 0, 0);
 
-	switchEditViewTo(otherFromView(whichOne));
 	auto viewToDisable = static_cast<UCHAR>(whichOne == SUB_VIEW ? WindowSubActive : WindowMainActive);
 	_mainWindowStatus &= static_cast<UCHAR>(~viewToDisable);
+	switchEditViewTo(otherFromView(whichOne));
 }
 
 bool Notepad_plus::loadStyles()
@@ -6702,7 +6700,7 @@ void Notepad_plus::notifyBufferChanged(Buffer * buffer, int mask)
 	if (mask & (BufferChangeDirty|BufferChangeFilename))
 	{
 		if (mask & BufferChangeFilename)
-			::SendMessage(_pPublicInterface->getHSelf(), NPPM_INTERNAL_REFRESHTABAR, 0, 0);
+			::SendMessage(_pPublicInterface->getHSelf(), WM_SIZE, 0, 0);
 
 		checkDocState();
 		setTitle();
@@ -8655,23 +8653,22 @@ void Notepad_plus::launchDocumentBackupTask()
 
 DWORD WINAPI Notepad_plus::backupDocument(void * /*param*/)
 {
-	bool isSnapshotMode = true;
-	while (isSnapshotMode)
-	{
-		NppParameters& nppParam = NppParameters::getInstance();
+	NppGUI& nppGUI = (NppParameters::getInstance()).getNppGUI();
 
-		size_t timer = nppParam.getNppGUI()._snapshotBackupTiming;
+	while (!g_bNppExitFlag.load() && nppGUI.isSnapshotMode())
+	{
+		size_t timer = nppGUI._snapshotBackupTiming;
 		if (timer < 1000)
 			timer = 1000;
 
 		::Sleep(DWORD(timer));
 
-		isSnapshotMode = nppParam.getNppGUI().isSnapshotMode();
-		if (!isSnapshotMode)
+		if (g_bNppExitFlag.load() || !nppGUI.isSnapshotMode())
 			break;
 
 		::SendMessage(Notepad_plus_Window::gNppHWND, NPPM_INTERNAL_SAVEBACKUP, 0, 0);
 	}
+
 	return ERROR_SUCCESS;
 }
 
